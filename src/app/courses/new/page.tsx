@@ -20,10 +20,31 @@ export default function NewCoursePage() {
   const [isRecording, setIsRecording] = useState(false);
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState<"info" | "spots">("info");
+  const [userLocation, setUserLocation] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const supabase = createClient();
+
+  // Get user's current location on mount
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLocation({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+      },
+      () => {
+        // Silently fall back to default (Nagasaki)
+      },
+      { enableHighAccuracy: true, timeout: 5000 }
+    );
+  }, []);
 
   // Create course in DB when moving to spots step
   const handleCreateCourse = async () => {
@@ -225,13 +246,15 @@ export default function NewCoursePage() {
         <CourseMap
           spots={spots}
           pendingSpot={pendingSpot}
+          center={userLocation ?? undefined}
           className="w-full h-full"
           onMapClick={mode === "manual" ? handleMapClick : undefined}
           interactive
+          showSearch
         />
 
-        {/* Floating header overlay */}
-        <div className="absolute top-3 left-3 right-3">
+        {/* Floating header overlay - below search bar */}
+        <div className="absolute top-14 left-3 right-3 z-[5]">
           <div className="bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-sm">
             <h1 className="text-sm font-bold text-gray-900 truncate">
               {title}

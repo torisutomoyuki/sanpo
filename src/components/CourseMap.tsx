@@ -7,9 +7,12 @@ import {
   Marker,
   Pin,
   useMap,
+  useMapsLibrary,
 } from "@vis.gl/react-google-maps";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Spot } from "@/lib/types";
+
+const DEFAULT_CENTER = { lat: 32.7503, lng: 129.8779 };
 
 function DirectionsRoute({ spots }: { spots: Spot[] }) {
   const map = useMap();
@@ -19,7 +22,6 @@ function DirectionsRoute({ spots }: { spots: Spot[] }) {
   useEffect(() => {
     if (!map || spots.length < 2) return;
 
-    // Clean up previous renders
     rendererRef.current?.setMap(null);
     polylineRef.current?.setMap(null);
 
@@ -57,7 +59,6 @@ function DirectionsRoute({ spots }: { spots: Spot[] }) {
         if (status === google.maps.DirectionsStatus.OK && result) {
           directionsRenderer.setDirections(result);
         } else {
-          // Fallback: straight-line polyline if Directions API fails
           const path = spots.map((s) => ({ lat: s.lat, lng: s.lng }));
           const polyline = new google.maps.Polyline({
             path,
@@ -112,38 +113,103 @@ function MapClickHandler({
   return null;
 }
 
+function PlacesSearchBar() {
+  const map = useMap();
+  const placesLib = useMapsLibrary("places");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+
+  useEffect(() => {
+    if (!placesLib || !inputRef.current || !map) return;
+
+    const autocomplete = new placesLib.Autocomplete(inputRef.current, {
+      fields: ["geometry", "name"],
+      types: ["establishment", "geocode"],
+    });
+    autocompleteRef.current = autocomplete;
+
+    autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
+      if (place.geometry?.location) {
+        map.panTo(place.geometry.location);
+        map.setZoom(16);
+      }
+    });
+
+    return () => {
+      google.maps.event.clearInstanceListeners(autocomplete);
+    };
+  }, [placesLib, map]);
+
+  return (
+    <div className="absolute top-3 left-3 right-3 z-10">
+      <input
+        ref={inputRef}
+        type="text"
+        placeholder="住所・スポット名で検索"
+        className="w-full bg-white shadow-md rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 border-0"
+      />
+    </div>
+  );
+}
+
+function MapCenterUpdater({
+  center,
+}: {
+  center: { lat: number; lng: number };
+}) {
+  const map = useMap();
+  const initializedRef = useRef(false);
+
+  useEffect(() => {
+    if (!map || initializedRef.current) return;
+    initializedRef.current = true;
+    map.panTo(center);
+  }, [map, center]);
+
+  return null;
+}
+
 type PendingSpot = { lat: number; lng: number };
 
 type CourseMapProps = {
   spots: Spot[];
   pendingSpot?: PendingSpot | null;
+  center?: { lat: number; lng: number };
   className?: string;
   onMapClick?: (lat: number, lng: number) => void;
   interactive?: boolean;
+  showSearch?: boolean;
 };
 
 export default function CourseMap({
   spots,
   pendingSpot,
+  center,
   className = "w-full h-64",
   onMapClick,
   interactive = false,
+  showSearch = false,
 }: CourseMapProps) {
-  const center =
+  const defaultCenter =
     spots.length > 0
       ? { lat: spots[0].lat, lng: spots[0].lng }
-      : { lat: 32.7503, lng: 129.8779 }; // 長崎市デフォルト
+      : DEFAULT_CENTER;
 
   return (
-    <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}>
-      <div className={className}>
+    <APIProvider
+      apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}
+      libraries={showSearch ? ["places"] : []}
+    >
+      <div className={`relative ${className}`}>
         <Map
-          defaultCenter={center}
+          defaultCenter={defaultCenter}
           defaultZoom={14}
           gestureHandling="greedy"
           disableDefaultUI={!interactive}
           mapId="mappo-map"
         >
+          {center && <MapCenterUpdater center={center} />}
           {onMapClick && <MapClickHandler onClick={onMapClick} />}
           {spots.map((spot, i) => (
             <Marker
@@ -166,6 +232,7 @@ export default function CourseMap({
             </AdvancedMarker>
           )}
           <DirectionsRoute spots={spots} />
+          {showSearch && <PlacesSearchBar />}
         </Map>
       </div>
     </APIProvider>

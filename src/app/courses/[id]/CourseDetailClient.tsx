@@ -24,6 +24,13 @@ export default function CourseDetailClient({
     }
   };
 
+  const handleOpenGoogleMaps = () => {
+    if (spots.length === 0) return;
+    const path = spots.map((s) => `${s.lat},${s.lng}`).join("/");
+    const url = `https://www.google.com/maps/dir/${path}`;
+    window.open(url, "_blank");
+  };
+
   return (
     <div className="pb-8">
       {course.cover_image_url ? (
@@ -94,6 +101,27 @@ export default function CourseDetailClient({
             </div>
           ))}
         </div>
+
+        {spots.length >= 2 && (
+          <button
+            onClick={handleOpenGoogleMaps}
+            className="w-full mt-6 bg-blue-600 text-white py-4 rounded-xl font-medium text-base flex items-center justify-center gap-2 shadow-md active:bg-blue-700"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="w-5 h-5"
+            >
+              <path
+                fillRule="evenodd"
+                d="M11.54 22.351l.07.04.028.016a.76.76 0 00.723 0l.028-.015.071-.041a16.975 16.975 0 001.144-.742 19.58 19.58 0 002.683-2.282c1.944-1.99 3.963-4.98 3.963-8.827a8.25 8.25 0 00-16.5 0c0 3.846 2.02 6.837 3.963 8.827a19.58 19.58 0 002.682 2.282 16.975 16.975 0 001.145.742z"
+                clipRule="evenodd"
+              />
+            </svg>
+            Google Maps で歩く
+          </button>
+        )}
       </div>
     </div>
   );
